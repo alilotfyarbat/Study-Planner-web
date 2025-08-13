@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برنامه‌ریز مطالعه - Study Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Vazirmatn', sans-serif;
+        }
+        .task-card {
+            transition: all 0.3s ease;
+        }
+        .task-card:hover {
+            transform: translateY(-2px);
+        }
+        .countdown-active {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        .dark {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .dark .bg-white {
+            background-color: #2d3748;
+        }
+        .dark .text-gray-700 {
+            color: #e2e8f0;
+        }
+        .dark .text-gray-600 {
+            color: #cbd5e0;
+        }
+        .dark .bg-gray-50 {
+            background-color: #374151;
+        }
+        .dark .border-gray-200 {
+            border-color: #4a5568;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen" id="body">
+    <div class="container mx-auto p-4 max-w-7xl">
+        <!-- Header with Clock and Controls -->
+        <header class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex flex-col lg:flex-row justify-between items-center gap-4">
+                <div class="text-center lg:text-right">
+                    <h1 class="text-3xl font-bold text-indigo-600 mb-2">برنامه‌ریز مطالعه</h1>
+                    <div class="text-gray-600">
+                        <div id="shamsiDate" class="text-xl font-semibold"></div>
+                        <div id="dayOfWeek" class="text-lg"></div>
+                        <div id="clock" class="text-2xl font-mono text-indigo-500 mt-2"></div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 justify-center">
+                    <button onclick="toggleDarkMode()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">
+                        🌙 حالت شب
+                    </button>
+                    <button onclick="showAddTaskModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
+                        ➕ افزودن وظیفه جدید
+                    </button>
+                    <button onclick="exportTasks()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                        📥 دانلود
+                    </button>
+                    <label class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition cursor-pointer">
+                        📤 بارگذاری
+                        <input type="file" accept=".json" onchange="importTasks(event)" class="hidden">
+                    </label>
+                </div>
+            </div>
+        </header>
+
+        <!-- Filter and Search Section -->
+        <div class="bg-white rounded-xl shadow-lg p-4 mb-6">
+            <div class="flex flex-col md:flex-row gap-4">
+                <input type="text" id="searchInput" placeholder="جستجو در عنوان..." 
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                    oninput="filterTasks()">
+                <select id="filterType" onchange="filterTasks()" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500">
+                    <option value="">همه فعالیت‌ها</option>
+                    <option value="study">مطالعه</option>
+                    <option value="review">مرور</option>
+                    <option value="practice">تمرین</option>
+                    <option value="exam">امتحان</option>
+                    <option value="rest">استراحت</option>
+                </select>
+                <select id="filterPriority" onchange="filterTasks()" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500">
+                    <option value="">همه اولویت‌ها</option>
+                    <option value="low">پایین</option>
+                    <option value="medium">متوسط</option>
+                    <option value="high">بالا</option>
+                </select>
+                <button onclick="showTodayTasks()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">
+                    📅 وظایف امروز
+                </button>
+            </div>
+        </div>
+
+        <!-- Today's Agenda -->
+        <div id="todayAgenda" class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 mb-6 hidden">
+            <h2 class="text-xl font-bold text-yellow-800 mb-3">📋 برنامه امروز</h2>
+            <div id="todayTasksList" class="space-y-2"></div>
+        </div>
+
+        <!-- Task List -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">لیست وظایف</h2>
+            <div id="taskList" class="space-y-4 max-h-96 overflow-y-auto">
+                <!-- Tasks will be rendered here -->
+            </div>
+            <div id="emptyState" class="text-center py-12 text-gray-500 hidden">
+                <div class="text-6xl mb-4">📚</div>
+                <p class="text-xl">هنوز وظیفه‌ای اضافه نشده است</p>
+                <p class="mt-2">برای شروع، روی دکمه "افزودن وظیفه جدید" کلیک کنید</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Task Modal -->
+    <div id="addTaskModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 class="text-2xl font-bold text-gray-700 mb-4">افزودن وظیفه جدید</h3>
+            <form id="addTaskForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">عنوان</label>
+                    <input type="text" id="taskTitle" required 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">تاریخ (روز/ماه/سال)</label>
+                    <input type="text" id="taskDate" placeholder="مثال: 15/1/1404" required 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ساعت شروع</label>
+                        <input type="time" id="taskStartTime" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">مدت (دقیقه)</label>
+                        <input type="number" id="taskDuration" min="1" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">نوع فعالیت</label>
+                        <select id="taskType" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500">
+                            <option value="study">مطالعه</option>
+                            <option value="review">مرور</option>
+                            <option value="practice">تمرین</option>
+                            <option value="exam">امتحان</option>
+                            <option value="rest">استراحت</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">اولویت</label>
+                        <select id="taskPriority" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500">
+                            <option value="low">پایین</option>
+                            <option value="medium">متوسط</option>
+                            <option value="high">بالا</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">یادداشت (اختیاری)</label>
+                    <textarea id="taskNotes" rows="2" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"></textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition">
+                        ذخیره
+                    </button>
+                    <button type="button" onclick="closeAddTaskModal()" 
+                        class="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition">
+                        انصراف
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 left-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg hidden z-50">
+        <span id="toastMessage"></span>
+    </div>
+
+    <script>
+        // Persian Calendar Conversion
+        function toJalaali(gy, gm, gd) {
+            const g_d_n = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+            let jy = (gy <= 1600) ? 0 : 979;
+            gy -= (gy <= 1600) ? 621 : 1600;
+            const gy2 = (gm > 2) ? gy + 1 : gy;
+            let days = (365 * gy) + (Math.floor((gy2 + 3) / 4)) - (Math.floor((gy2 + 99) / 100)) + (Math.floor((gy2 + 399) / 400)) - 80 + gd + g_d_n[gm - 1];
+            jy += 33 * Math.floor(days / 12053);
+            days %= 12053;
+            jy += 4 * Math.floor(days / 1461);
+            days %= 1461;
+            if (days > 365) {
+                jy += Math.floor((days - 1) / 365);
+                days = (days - 1) % 365;
+            }
+            const jm = (days < 186) ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
+            const jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
+            return [jy, jm, jd];
+        }
+
+        function fromJalaali(jy, jm, jd) {
+            let gy = (jy <= 979) ? 621 : 1600;
+            jy -= (jy <= 979) ? 0 : 979;
+            const days = (365 * jy) + (Math.floor(jy / 33) * 8) + Math.floor(((jy % 33) + 3) / 4) + 78 + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+            gy += 400 * Math.floor(days / 146097);
+            let temp = days % 146097;
+            let leap = true;
+            if (temp >= 36525) {
+                temp--;
+                gy += 100 * Math.floor(temp / 36524);
+                temp %= 36524;
+                if (temp >= 365) temp++;
+            }
+            gy += 4 * Math.floor(temp / 1461);
+            temp %= 1461;
+            if (temp >= 366) {
+                leap = false;
+                temp--;
+                gy += Math.floor(temp / 365);
+                temp = temp % 365;
+            }
+            const g_d_n = [0, 31, (leap ? 29 : 28), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            let gm;
+            for (gm = 0; temp >= g_d_n[gm] + g_d_n[gm + 1]; gm++) {
+                temp -= g_d_n[gm];
+            }
+            const gd = temp + 1;
+            return [gy, gm, gd];
+        }
+
+        // Global Variables
+        let tasks = [];
+        let activeTimers = {};
+        let darkMode = false;
+
+        // Persian Month and Day Names
+        const persianMonths = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+        const persianDays = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه', 'شنبه'];
+
+        // Activity Type Colors
+        const activityColors = {
+            study: 'bg-blue-100 text-blue-800',
+            review: 'bg-green-100 text-green-800',
+            practice: 'bg-purple-100 text-purple-800',
+            exam: 'bg-red-100 text-red-800',
+            rest: 'bg-yellow-100 text-yellow-800'
+        };
+
+        const activityLabels = {
+            study: 'مطالعه',
+            review: 'مرور',
+            practice: 'تمرین',
+            exam: 'امتحان',
+            rest: 'استراحت'
+        };
+
+        const priorityColors = {
+            low: 'text-green-600',
+            medium: 'text-yellow-600',
+            high: 'text-red-600'
+        };
+
+        const priorityLabels = {
+            low: 'پایین',
+            medium: 'متوسط',
+            high: 'بالا'
+        };
+
+        // Clock and Date Functions
+        function updateClock() {
+            const now = new Date();
+            const tehranTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tehran"}));
+            
+            const hours = String(tehranTime.getHours()).padStart(2, '0');
+            const minutes = String(tehranTime.getMinutes()).padStart(2, '0');
+            const seconds = String(tehranTime.getSeconds()).padStart(2, '0');
+            
+            document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+            
+            const [jy, jm, jd] = toJalaali(tehranTime.getFullYear(), tehranTime.getMonth() + 1, tehranTime.getDate());
+            document.getElementById('shamsiDate').textContent = `${jd} ${persianMonths[jm - 1]} ${jy}`;
+            document.getElementById('dayOfWeek').textContent = persianDays[tehranTime.getDay()];
+        }
+
+        function getCurrentShamsiDate() {
+            const now = new Date();
+            const tehranTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tehran"}));
+            const [jy, jm, jd] = toJalaali(tehranTime.getFullYear(), tehranTime.getMonth() + 1, tehranTime.getDate());
+            return `${jd}/${jm}/${jy}`;
+        }
+
+        // Task Management Functions
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        function addTask(event) {
+            event.preventDefault();
+            
+            const title = document.getElementById('taskTitle').value;
+            const date = document.getElementById('taskDate').value;
+            const startTime = document.getElementById('taskStartTime').value;
+            const duration = parseInt(document.getElementById('taskDuration').value);
+            const type = document.getElementById('taskType').value;
+            const priority = document.getElementById('taskPriority').value;
+            const notes = document.getElementById('taskNotes').value;
+            
+            // Validate date format
+            const dateParts = date.split('/');
+            if (dateParts.length !== 3) {
+                showToast('فرمت تاریخ نادرست است', 'error');
+                return;
+            }
+            
+            // Calculate end time
+            const [startHour, startMinute] = startTime.split(':').map(Number);
+            const totalMinutes = startHour * 60 + startMinute + duration;
+            const endHour = Math.floor(totalMinutes / 60) % 24;
+            const endMinute = totalMinutes % 60;
+            const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+            
+            const task = {
+                id: generateId(),
+                title,
+                date,
+                startTime,
+                duration,
+                endTime,
+                type,
+                priority,
+                notes,
+                completed: false,
+                active: false
+            };
+            
+            tasks.push(task);
+            saveTasks();
+            renderTasks();
+            closeAddTaskModal();
+            showToast('وظیفه با موفقیت اضافه شد');
+            document.getElementById('addTaskForm').reset();
+        }
+
+        function deleteTask(id) {
+            if (confirm('آیا از حذف این وظیفه مطمئن هستید؟')) {
+                tasks = tasks.filter(task => task.id !== id);
+                if (activeTimers[id]) {
+                    clearInterval(activeTimers[id]);
+                    delete activeTimers[id];
+                }
+                saveTasks();
+                renderTasks();
+                showToast('وظیفه حذف شد');
+            }
+        }
+
+        function completeTask(id) {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                task.active = false;
+                if (activeTimers[id]) {
+                    clearInterval(activeTimers[id]);
+                    delete activeTimers[id];
+                }
+                saveTasks();
+                renderTasks();
+                showToast(task.completed ? 'وظیفه تکمیل شد' : 'وظیفه از حالت تکمیل خارج شد');
+            }
+        }
+
+        function startTask(id) {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.active = true;
+                task.startedAt = Date.now();
+                saveTasks();
+                renderTasks();
+                showToast('وظیفه شروع شد');
+                
+                // Play sound
+                playNotificationSound();
+                
+                // Start duration countdown
+                activeTimers[id] = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - task.startedAt) / 1000);
+                    const remaining = (task.duration * 60) - elapsed;
+                    
+                    if (remaining <= 0) {
+                        clearInterval(activeTimers[id]);
+                        delete activeTimers[id];
+                        task.active = false;
+                        task.completed = true;
+                        saveTasks();
+                        renderTasks();
+                        showToast('وظیفه به پایان رسید!');
+                        playNotificationSound();
+                    } else {
+                        updateTaskTimer(id, remaining);
+                    }
+                }, 1000);
+            }
+        }
+
+        function updateTaskTimer(id, remaining) {
+            const timerElement = document.getElementById(`timer-${id}`);
+            if (timerElement) {
+                const hours = Math.floor(remaining / 3600);
+                const minutes = Math.floor((remaining % 3600) / 60);
+                const seconds = remaining % 60;
+                
+                let timeStr = '';
+                if (hours > 0) timeStr += `${hours} ساعت `;
+                if (minutes > 0) timeStr += `${minutes} دقیقه `;
+                timeStr += `${seconds} ثانیه`;
+                
+                timerElement.textContent = `زمان باقی‌مانده: ${timeStr}`;
+            }
+        }
+
+        function calculateCountdown(task) {
+            const now = new Date();
+            const tehranTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tehran"}));
+            const [jy, jm, jd] = toJalaali(tehranTime.getFullYear(), tehranTime.getMonth() + 1, tehranTime.getDate());
+            const currentDate = `${jd}/${jm}/${jy}`;
+            
+            const [taskDay, taskMonth, taskYear] = task.date.split('/').map(Number);
+            const [taskHour, taskMinute] = task.startTime.split(':').map(Number);
+            
+            // Convert task date to Gregorian
+            const [gy, gm, gd] = fromJalaali(taskYear, taskMonth, taskDay);
+            const taskDateTime = new Date(gy, gm - 1, gd, taskHour, taskMinute);
+            
+            const diff = taskDateTime - tehranTime;
+            
+            if (diff <= 0) return 'زمان شروع فرا رسیده';
+            
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            
+            let countdown = '';
+            if (days > 0) countdown += `${days} روز `;
+            if (hours > 0) countdown += `${hours} ساعت `;
+            if (minutes > 0) countdown += `${minutes} دقیقه `;
+            
+            return countdown || 'به زودی';
+        }
+
+        function renderTasks() {
+            const taskList = document.getElementById('taskList');
+            const emptyState = document.getElementById('emptyState');
+            
+            // Apply filters
+            let filteredTasks = [...tasks];
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filterType = document.getElementById('filterType').value;
+            const filterPriority = document.getElementById('filterPriority').value;
+            
+            if (searchTerm) {
+                filteredTasks = filteredTasks.filter(task => 
+                    task.title.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            if (filterType) {
+                filteredTasks = filteredTasks.filter(task => task.type === filterType);
+            }
+            
+            if (filterPriority) {
+                filteredTasks = filteredTasks.filter(task => task.priority === filterPriority);
+            }
+            
+            // Sort by date and time
+            filteredTasks.sort((a, b) => {
+                const [aDay, aMonth, aYear] = a.date.split('/').map(Number);
+                const [bDay, bMonth, bYear] = b.date.split('/').map(Number);
+                
+                if (aYear !== bYear) return aYear - bYear;
+                if (aMonth !== bMonth) return aMonth - bMonth;
+                if (aDay !== bDay) return aDay - bDay;
+                
+                const [aHour, aMinute] = a.startTime.split(':').map(Number);
+                const [bHour, bMinute] = b.startTime.split(':').map(Number);
+                
+                if (aHour !== bHour) return aHour - bHour;
+                return aMinute - bMinute;
+            });
+            
+            if (filteredTasks.length === 0) {
+                taskList.innerHTML = '';
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                taskList.innerHTML = filteredTasks.map(task => `
+                    <div class="task-card bg-gray-50 border-r-4 ${task.completed ? 'opacity-60' : ''} ${task.active ? 'border-green-500 countdown-active' : getPriorityBorder(task.priority)} rounded-lg p-4 shadow-md">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                            <div class="flex-1">
+                                <h3 class="text-lg font-bold ${task.completed ? 'line-through' : ''}">${task.title}</h3>
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    <span class="text-sm text-gray-600">📅 ${task.date}</span>
+                                    <span class="text-sm text-gray-600">⏰ ${task.startTime} - ${task.endTime}</span>
+                                    <span class="text-sm text-gray-600">⏱️ ${task.duration} دقیقه</span>
+                                </div>
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    <span class="px-2 py-1 rounded-full text-xs ${activityColors[task.type]}">${activityLabels[task.type]}</span>
+                                    <span class="px-2 py-1 rounded-full text-xs bg-gray-200 ${priorityColors[task.priority]}">${priorityLabels[task.priority]}</span>
+                                </div>
+                                ${task.notes ? `<p class="text-sm text-gray-500 mt-2">📝 ${task.notes}</p>` : ''}
+                                ${!task.completed && !task.active ? `<div class="text-sm text-indigo-600 mt-2">⏳ ${calculateCountdown(task)}</div>` : ''}
+                                ${task.active ? `<div id="timer-${task.id}" class="text-sm text-green-600 font-bold mt-2"></div>` : ''}
+                            </div>
+                            <div class="flex gap-2">
+                                ${!task.completed && !task.active ? `
+                                    <button onclick="startTask('${task.id}')" class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition">
+                                        ▶️ شروع
+                                    </button>
+                                ` : ''}
+                                <button onclick="completeTask('${task.id}')" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition">
+                                    ${task.completed ? '↩️ بازگشت' : '✅ تکمیل'}
+                                </button>
+                                <button onclick="deleteTask('${task.id}')" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition">
+                                    🗑️ حذف
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            // Update countdown every second
+            setTimeout(() => {
+                if (document.getElementById('taskList')) {
+                    tasks.forEach(task => {
+                        if (!task.completed && !task.active) {
+                            const countdownElements = document.querySelectorAll('.text-indigo-600');
+                            countdownElements.forEach(el => {
+                                if (el.textContent.includes('⏳')) {
+                                    const parentCard = el.closest('.task-card');
+                                    if (parentCard) {
+                                        const taskId = tasks.find(t => 
+                                            parentCard.innerHTML.includes(t.title)
+                                        )?.id;
+                                        if (taskId) {
+                                            const task = tasks.find(t => t.id === taskId);
+                                            if (task) {
+                                                el.textContent = `⏳ ${calculateCountdown(task)}`;
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            }, 60000); // Update every minute
+        }
+
+        function getPriorityBorder(priority) {
+            switch(priority) {
+                case 'high': return 'border-red-500';
+                case 'medium': return 'border-yellow-500';
+                case 'low': return 'border-green-500';
+                default: return 'border-gray-300';
+            }
+        }
+
+        function filterTasks() {
+            renderTasks();
+        }
+
+        function showTodayTasks() {
+            const todayAgenda = document.getElementById('todayAgenda');
+            const todayTasksList = document.getElementById('todayTasksList');
+            const currentDate = getCurrentShamsiDate();
+            
+            const todayTasks = tasks.filter(task => task.date === currentDate && !task.completed);
+            
+            if (todayTasks.length === 0) {
+                todayTasksList.innerHTML = '<p class="text-gray-600">امروز وظیفه‌ای ندارید</p>';
+            } else {
+                todayTasksList.innerHTML = todayTasks.map(task => `
+                    <div class="bg-white p-3 rounded-lg shadow">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="font-semibold">${task.title}</span>
+                                <span class="text-sm text-gray-600 mr-2">⏰ ${task.startTime}</span>
+                            </div>
+                            <span class="px-2 py-1 rounded text-xs ${activityColors[task.type]}">${activityLabels[task.type]}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            todayAgenda.classList.toggle('hidden');
+        }
+
+        // Modal Functions
+        function showAddTaskModal() {
+            document.getElementById('addTaskModal').classList.remove('hidden');
+            document.getElementById('taskDate').value = getCurrentShamsiDate();
+        }
+
+        function closeAddTaskModal() {
+            document.getElementById('addTaskModal').classList.add('hidden');
+        }
+
+        // Storage Functions
+        function saveTasks() {
+            localStorage.setItem('studyPlannerTasks', JSON.stringify(tasks));
+        }
+
+        function loadTasks() {
+            const saved = localStorage.getItem('studyPlannerTasks');
+            if (saved) {
+                tasks = JSON.parse(saved);
+                // Restore active timers
+                tasks.forEach(task => {
+                    if (task.active && task.startedAt) {
+                        const elapsed = Math.floor((Date.now() - task.startedAt) / 1000);
+                        const remaining = (task.duration * 60) - elapsed;
+                        
+                        if (remaining > 0) {
+                            activeTimers[task.id] = setInterval(() => {
+                                const elapsed = Math.floor((Date.now() - task.startedAt) / 1000);
+                                const remaining = (task.duration * 60) - elapsed;
+                                
+                                if (remaining <= 0) {
+                                    clearInterval(activeTimers[task.id]);
+                                    delete activeTimers[task.id];
+                                    task.active = false;
+                                    task.completed = true;
+                                    saveTasks();
+                                    renderTasks();
+                                    showToast('وظیفه به پایان رسید!');
+                                    playNotificationSound();
+                                } else {
+                                    updateTaskTimer(task.id, remaining);
+                                }
+                            }, 1000);
+                        } else {
+                            task.active = false;
+                            task.completed = true;
+                        }
+                    }
+                });
+            }
+        }
+
+        function exportTasks() {
+            const dataStr = JSON.stringify(tasks, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = `study-planner-${getCurrentShamsiDate().replace(/\//g, '-')}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            showToast('فایل با موفقیت دانلود شد');
+        }
+
+        function importTasks(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const importedTasks = JSON.parse(e.target.result);
+                        if (Array.isArray(importedTasks)) {
+                            if (confirm('آیا از جایگزینی وظایف فعلی با فایل بارگذاری شده مطمئن هستید؟')) {
+                                tasks = importedTasks;
+                                saveTasks();
+                                renderTasks();
+                                showToast('فایل با موفقیت بارگذاری شد');
+                            }
+                        } else {
+                            showToast('فرمت فایل نامعتبر است', 'error');
+                        }
+                    } catch (error) {
+                        showToast('خطا در خواندن فایل', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // UI Functions
+        function toggleDarkMode() {
+            darkMode = !darkMode;
+            document.body.classList.toggle('dark');
+            localStorage.setItem('darkMode', darkMode);
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastMessage.textContent = message;
+            toast.className = `fixed bottom-4 left-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
+                type === 'error' ? 'bg-red-600' : 'bg-green-600'
+            } text-white`;
+            toast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        function playNotificationSound() {
+            // Create a simple beep sound
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.5);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load saved data
+            loadTasks();
+            renderTasks();
+            
+            // Load dark mode preference
+            const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+            if (savedDarkMode) {
+                darkMode = true;
+                document.body.classList.add('dark');
+            }
+            
+            // Update clock every second
+            updateClock();
+            setInterval(updateClock, 1000);
+            
+            // Add form submit listener
+            document.getElementById('addTaskForm').addEventListener('submit', addTask);
+            
+            // Close modal on outside click
+            document.getElementById('addTaskModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeAddTaskModal();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
